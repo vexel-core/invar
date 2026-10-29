@@ -34,7 +34,7 @@ export function detectTestRunner(cwd: string): string {
     return 'go test ./...';
   }
 
-  return 'npm test';
+  return '';
 }
 
 export function getDefaultConfig(cwd: string): InvarConfig {

@@ -12,13 +12,17 @@ export interface ShadowWorktreeInstance {
 }
 
 export function runGit(args: string[], cwd: string): string {
+  return runGitRaw(args, cwd).trim();
+}
+
+export function runGitRaw(args: string[], cwd: string): string {
   try {
     return execSync(`git ${args.join(' ')}`, {
       cwd,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
-    }).trim();
+    });
   } catch (err: any) {
     const stderr = err.stderr ? err.stderr.toString() : err.message;
     throw new Error(`Git error (${args.join(' ')}): ${stderr}`);

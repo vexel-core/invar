@@ -15,34 +15,14 @@ import { evaluateAstInvariants } from '../gate/rules.js';
 import { captureActiveTreeStatus, detectActiveTreeEscape } from './escape.js';
 import { saveAuditLog } from '../audit/logger.js';
 
+import { parkQuarantine } from './quarantine.js';
+
+export { parkQuarantine };
+export * from './quarantine.js';
+
 export interface CoordinatorOptions {
   intent?: string;
   onLog?: (message: string) => void;
-}
-
-export function parkQuarantine(
-  baseDir: string,
-  txId: string,
-  diff: string,
-  status: 'tampered' | 'test_failure' | 'ast_violation',
-  reason: string
-): string {
-  const qDir = path.join(baseDir, '.invar', 'quarantine', txId);
-  fs.mkdirSync(qDir, { recursive: true });
-
-  const manifest = {
-    txId,
-    status,
-    reason,
-    timestamp: new Date().toISOString(),
-  };
-
-  fs.writeFileSync(path.join(qDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
-  if (diff) {
-    fs.writeFileSync(path.join(qDir, 'candidate.patch'), diff, 'utf8');
-  }
-
-  return qDir;
 }
 
 export function getModifiedFiles(shadowDir: string, baseCommit: string): string[] {
@@ -218,7 +198,7 @@ export async function executeTransaction(
     // 9. All gates passed -> Atomic Commit!
     log(`[invar] All invariant gates passed! Applying atomic commit...`);
     diff = extractShadowDiff(baseDir, shadow.shadowDir, shadow.baseCommit);
-    const merge = applyShadowDiffToActiveTree(baseDir, shadow.shadowDir, shadow.baseCommit);
+    const merge = applyShadowDiffToActiveTree(baseDir, shadow.shadowDir, shadow.baseCommit, diff);
 
     if (!merge.success) {
       destroyShadowWorktree(baseDir, shadow.shadowDir, shadow.linkedJunctions);

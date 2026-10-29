@@ -10,5 +10,7 @@ export * from './gate/runner.js';
 export * from './gate/ast.js';
 export * from './gate/rules.js';
 export * from './tx/coordinator.js';
+export * from './tx/quarantine.js';
 export * from './tx/escape.js';
 export * from './audit/logger.js';
+export * from './mcp/server.js';

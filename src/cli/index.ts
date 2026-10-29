@@ -11,6 +11,8 @@ import { executeTransaction } from '../tx/coordinator.js';
 import { computeVaultState } from '../vault/hasher.js';
 import { evaluateAstInvariants } from '../gate/rules.js';
 import { runGit } from '../shadow/worktree.js';
+import { listQuarantinedTransactions, applyQuarantinedDiff } from '../tx/quarantine.js';
+import { startMcpServer } from '../mcp/server.js';
 
 const program = new Command();
 
@@ -26,7 +28,6 @@ program
   .action(() => {
     const cwd = process.cwd();
     const tomlPath = path.join(cwd, '.invar.toml');
-
     if (fs.existsSync(tomlPath)) {
       console.log(chalk.yellow('[invar] .invar.toml already exists in this directory.'));
       return;
@@ -34,36 +35,24 @@ program
 
     const testRunner = detectTestRunner(cwd);
     const projectName = path.basename(cwd);
-
-    const template = `[project]
-name = "${projectName}"
-test_runner = "${testRunner}"
-
-[vault]
-mode = "strict"
-locked_paths = [
-  "tests/**",
-  "test/**",
-  "__tests__/**",
-  "**/*.spec.*",
-  "**/*.test.*"
-]
-
-[shadow]
-quarantine_on_failure = true
-max_retries = 0
-windows_junctions = true
-
-[invariants]
-max_cyclomatic_complexity = 15
-max_function_lines = 60
-ban_duplicate_symbols = true
-`;
+    const template = `[project]\nname = "${projectName}"\ntest_runner = "${testRunner}"\n\n[vault]\nmode = "strict"\nlocked_paths = [\n  "tests/**",\n  "test/**",\n  "__tests__/**",\n  "**/*.spec.*",\n  "**/*.test.*"\n]\n\n[shadow]\nquarantine_on_failure = true\nmax_retries = 0\nwindows_junctions = true\n\n[invariants]\nmax_cyclomatic_complexity = 15\nmax_function_lines = 60\nban_duplicate_symbols = true\n`;
 
     fs.writeFileSync(tomlPath, template, 'utf8');
     console.log(chalk.green(`✔ Created .invar.toml with auto-detected test runner: "${testRunner}"`));
     console.log(chalk.cyan('You can now run tasks with: npx invar run "<command>"'));
   });
+
+function runAgentSubprocess(cmdString: string, shadowDir: string): void {
+  try {
+    execSync(cmdString, {
+      cwd: shadowDir,
+      stdio: 'inherit',
+      env: { ...process.env, INVAR_SHADOW: 'true' },
+    });
+  } catch (err: any) {
+    throw new Error(`Command exited with error: ${err.message}`);
+  }
+}
 
 // Command: run
 program
@@ -74,13 +63,11 @@ program
   .action(async (commandParts: string[], options: { strict?: boolean; appendOnly?: boolean }) => {
     const cwd = process.cwd();
     const config = loadConfig(cwd);
-
     if (options.strict) config.vault.mode = 'strict';
     if (options.appendOnly) config.vault.mode = 'append-only';
 
     const cmdString = commandParts.join(' ');
     console.log(chalk.bold.cyan('\ninvar v0.1.0 — The Invariant Agent Kernel\n'));
-
     const spinner = ora(chalk.blue(`Initializing transaction for: "${cmdString}"`)).start();
 
     const result = await executeTransaction(
@@ -88,24 +75,11 @@ program
       config,
       (shadowDir) => {
         spinner.text = chalk.yellow(`Running agent command inside shadow worktree...`);
-        try {
-          execSync(cmdString, {
-            cwd: shadowDir,
-            stdio: 'inherit',
-            env: {
-              ...process.env,
-              INVAR_SHADOW: 'true',
-            },
-          });
-        } catch (err: any) {
-          throw new Error(`Command exited with error: ${err.message}`);
-        }
+        runAgentSubprocess(cmdString, shadowDir);
       },
       {
         intent: cmdString,
-        onLog: (msg) => {
-          spinner.text = chalk.blue(msg);
-        },
+        onLog: (msg) => { spinner.text = chalk.blue(msg); },
       }
     );
 
@@ -142,19 +116,9 @@ program
     console.log(`Merkle Root:  ${chalk.gray(vault.rootHash)}\n`);
     console.log(chalk.green('✔ Vault configuration is healthy.'));
 
-    // AST Invariant evaluation across source files
     const sourceFiles = globSync('**/*.{ts,tsx,js,jsx,py}', {
       cwd,
-      ignore: [
-        'node_modules/**',
-        'dist/**',
-        'bin/**',
-        '.invar/**',
-        'tests/**',
-        '**/*.spec.*',
-        '**/*.test.*',
-        '**/*.config.*',
-      ],
+      ignore: ['node_modules/**', 'dist/**', 'bin/**', '.invar/**', 'tests/**', '**/*.spec.*', '**/*.test.*', '**/*.config.*'],
       absolute: true,
     });
 
@@ -170,33 +134,92 @@ program
     }
   });
 
-// Command: quarantine
+// Command: mcp
 program
-  .command('quarantine')
-  .description('List and inspect quarantined failure diffs')
+  .command('mcp')
+  .description('Launch the Model Context Protocol stdio server for IDE agents (Cursor, Claude Code, Windsurf)')
+  .action(async () => {
+    await startMcpServer(process.cwd());
+  });
+
+// Command: audit
+program
+  .command('audit [txId]')
+  .description('Inspect past transaction proofs and audit logs')
+  .action((txId?: string) => {
+    const cwd = process.cwd();
+    const auditDir = path.join(cwd, '.invar', 'audit');
+    if (!fs.existsSync(auditDir)) {
+      console.log(chalk.yellow('[invar] No audit logs recorded yet.'));
+      return;
+    }
+
+    if (txId) {
+      const logFile = path.join(auditDir, `${txId}.json`);
+      if (!fs.existsSync(logFile)) {
+        console.log(chalk.red(`[invar] No audit log found for transaction: ${txId}`));
+        return;
+      }
+      const data = JSON.parse(fs.readFileSync(logFile, 'utf8'));
+      console.log(chalk.bold.cyan(`\ninvar Transaction Audit Proof: ${txId}\n`));
+      console.log(JSON.stringify(data, null, 2));
+      return;
+    }
+
+    const files = fs.readdirSync(auditDir).filter((f) => f.endsWith('.json'));
+    if (files.length === 0) {
+      console.log(chalk.yellow('[invar] No audit logs recorded yet.'));
+      return;
+    }
+
+    console.log(chalk.bold.cyan(`\ninvar Past Transactions (${files.length}):\n`));
+    for (const file of files.slice(-10).reverse()) {
+      try {
+        const item = JSON.parse(fs.readFileSync(path.join(auditDir, file), 'utf8'));
+        console.log(`• ${chalk.bold(item.txId)} [${chalk.green(item.status)}] - ${item.intent || 'No intent provided'} (${chalk.gray(item.timestamp)})`);
+      } catch {}
+    }
+  });
+
+// Command: quarantine
+const quarantineCmd = program.command('quarantine').description('Manage and inspect quarantined failure diffs');
+
+quarantineCmd
+  .command('list', { isDefault: true })
+  .description('List all quarantined transactions')
   .action(() => {
     const cwd = process.cwd();
-    const qDir = path.join(cwd, '.invar', 'quarantine');
-
-    if (!fs.existsSync(qDir)) {
+    const list = listQuarantinedTransactions(cwd);
+    if (list.length === 0) {
       console.log(chalk.green('No quarantined transactions found. Repository is clean!'));
       return;
     }
 
-    const entries = fs.readdirSync(qDir);
-    if (entries.length === 0) {
-      console.log(chalk.green('No quarantined transactions found. Repository is clean!'));
-      return;
+    console.log(chalk.bold.yellow(`\nFound ${list.length} quarantined transactions:\n`));
+    for (const item of list) {
+      console.log(`• ${chalk.bold(item.txId)} [${chalk.red(item.status)}] - ${item.reason}`);
+      console.log(chalk.gray(`  Timestamp: ${item.timestamp}\n`));
     }
+  });
 
-    console.log(chalk.bold.yellow(`\nFound ${entries.length} quarantined transactions:\n`));
-    for (const txId of entries) {
-      const manifestPath = path.join(qDir, txId, 'manifest.json');
-      if (fs.existsSync(manifestPath)) {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-        console.log(`• ${chalk.bold(txId)} [${chalk.red(manifest.status)}] - ${manifest.reason}`);
-        console.log(chalk.gray(`  Path: ${path.join(qDir, txId)}\n`));
+quarantineCmd
+  .command('apply <txId>')
+  .description('Apply a quarantined diff to the active working tree')
+  .option('-x, --exclude-tests', 'Strip test file modifications to salvage implementation code')
+  .action((txId: string, options: { excludeTests?: boolean }) => {
+    const cwd = process.cwd();
+    const result = applyQuarantinedDiff(cwd, txId, { excludeTests: options.excludeTests });
+    if (result.success) {
+      console.log(chalk.green(`✔ Successfully applied quarantined diff for ${txId}!`));
+      if (result.appliedFiles.length > 0) {
+        console.log(chalk.cyan(`  Applied files: ${result.appliedFiles.join(', ')}`));
       }
+      if (result.excludedFiles.length > 0) {
+        console.log(chalk.yellow(`  Excluded test files: ${result.excludedFiles.join(', ')}`));
+      }
+    } else {
+      console.log(chalk.red(`✖ Failed to apply quarantined diff: ${result.error}`));
+      process.exit(1);
     }
   });
 
@@ -207,11 +230,9 @@ program
   .action(() => {
     const cwd = process.cwd();
     const shadowParent = path.join(cwd, '.invar', 'shadow');
-
     if (fs.existsSync(shadowParent)) {
       fs.rmSync(shadowParent, { recursive: true, force: true });
     }
-
     try {
       runGit(['worktree', 'prune'], cwd);
       console.log(chalk.green('✔ Pruned shadow worktrees and cleaned Git metadata.'));
@@ -224,5 +245,4 @@ export function runCli(): void {
   program.parse(process.argv);
 }
 
-// Auto-run when executed directly as CLI script
 runCli();

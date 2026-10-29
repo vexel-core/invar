@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from './worktree.js';
+import { runGit, runGitRaw } from './worktree.js';
 
 export interface MergeResult {
   success: boolean;
@@ -10,28 +10,30 @@ export interface MergeResult {
 }
 
 export function extractShadowDiff(baseDir: string, shadowDir: string, baseCommit: string): string {
-  // Commit changes inside the shadow worktree to capture the exact delta
   try {
     runGit(['add', '-A'], shadowDir);
     const status = runGit(['status', '--porcelain'], shadowDir);
-    if (!status) {
-      return ''; // No changes
+    if (status) {
+      runGit(['commit', '-m', 'invar: shadow transaction candidate'], shadowDir);
     }
-
-    runGit(['commit', '-m', 'invar: shadow transaction candidate'], shadowDir);
-    return runGit(['diff', baseCommit, 'HEAD'], shadowDir);
-  } catch (err: any) {
-    return runGit(['diff', baseCommit], shadowDir);
+    return runGitRaw(['diff', baseCommit, 'HEAD'], shadowDir);
+  } catch {
+    try {
+      return runGitRaw(['diff', baseCommit], shadowDir);
+    } catch {
+      return '';
+    }
   }
 }
 
 export function applyShadowDiffToActiveTree(
   baseDir: string,
   shadowDir: string,
-  baseCommit: string
+  baseCommit: string,
+  existingDiff?: string
 ): MergeResult {
-  const diff = extractShadowDiff(baseDir, shadowDir, baseCommit);
-  if (!diff) {
+  const diff = existingDiff !== undefined ? existingDiff : extractShadowDiff(baseDir, shadowDir, baseCommit);
+  if (!diff || !diff.trim()) {
     return {
       success: true,
       filesChanged: 0,
@@ -39,19 +41,21 @@ export function applyShadowDiffToActiveTree(
     };
   }
 
-  // Create temporary patch file
-  const patchFile = path.join(baseDir, '.invar', `apply_${Date.now()}.patch`);
-  try {
-    fs.writeFileSync(patchFile, diff, 'utf8');
+  const invarDir = path.join(baseDir, '.invar');
+  fs.mkdirSync(invarDir, { recursive: true });
 
-    // Apply patch directly to active working tree
+  const patchFile = path.join(invarDir, `apply_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.patch`);
+  try {
+    const normalizedDiff = (diff.endsWith('\n') ? diff : `${diff}\n`).replace(/\r\n/g, '\n');
+    fs.writeFileSync(patchFile, normalizedDiff, 'utf8');
     runGit(['apply', '--whitespace=nowarn', `"${patchFile}"`], baseDir);
 
-    const changedFiles = diff.split('\ndiff --git').length - 1;
+    const matchFiles = diff.match(/^diff --git /gm);
+    const changedFiles = matchFiles ? matchFiles.length : 1;
     return {
       success: true,
-      filesChanged: changedFiles || 1,
-      diff,
+      filesChanged: changedFiles,
+      diff: normalizedDiff,
     };
   } catch (err: any) {
     return {
