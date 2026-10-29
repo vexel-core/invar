@@ -64,6 +64,7 @@ export interface TransactionResult {
   preVaultRoot: string;
   postVaultRoot?: string;
   testResult?: TestExecutionResult;
+  astViolations?: string[];
   diff?: string;
   quarantinePath?: string;
 }

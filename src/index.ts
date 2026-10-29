@@ -7,6 +7,8 @@ export * from './shadow/junction.js';
 export * from './shadow/worktree.js';
 export * from './shadow/merger.js';
 export * from './gate/runner.js';
+export * from './gate/ast.js';
+export * from './gate/rules.js';
 export * from './tx/coordinator.js';
 export * from './tx/escape.js';
 export * from './audit/logger.js';

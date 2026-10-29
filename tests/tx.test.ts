@@ -43,6 +43,20 @@ describe('invar-tx (Transaction Coordinator & Quarantine)', () => {
     expect(fs.readFileSync(patchFile, 'utf8')).toBe(fakeDiff);
   });
 
+  it('parks AST architectural invariant violations in quarantine with status ast_violation', () => {
+    const txId = 'tx_ast_002';
+    const fakeDiff = 'diff --git a/src/presentation/view.ts b/src/presentation/view.ts\n+import { db } from "../infrastructure/db.js";';
+    const reason = 'AST Invariant Violation: Found 1 boundary violation';
+
+    const qPath = parkQuarantine(tmpDir, txId, fakeDiff, 'ast_violation', reason);
+
+    expect(fs.existsSync(qPath)).toBe(true);
+    const manifest = JSON.parse(fs.readFileSync(path.join(qPath, 'manifest.json'), 'utf8'));
+    expect(manifest.txId).toBe(txId);
+    expect(manifest.status).toBe('ast_violation');
+    expect(manifest.reason).toBe(reason);
+  });
+
   it('detects when an agent attempts an out-of-bounds escape', () => {
     const initialStatus = [' M src/existing.ts'];
 

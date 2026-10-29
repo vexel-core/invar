@@ -25,17 +25,56 @@ export function runGit(args: string[], cwd: string): string {
   }
 }
 
+function copyUntrackedFiles(baseDir: string, shadowDir: string): void {
+  try {
+    const untracked = runGit(['ls-files', '--others', '--exclude-standard'], baseDir);
+    if (!untracked) return;
+
+    const files = untracked.split(/\r?\n/).filter(Boolean);
+    for (const relFile of files) {
+      const srcPath = path.join(baseDir, relFile);
+      const destPath = path.join(shadowDir, relFile);
+      if (fs.existsSync(srcPath) && !fs.lstatSync(srcPath).isDirectory()) {
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  } catch {
+    // Non-fatal
+  }
+}
+
+function linkProjectDependencies(baseDir: string, shadowDir: string): string[] {
+  const linkedJunctions: string[] = [];
+  const itemsToLink = ['node_modules', '.env', '.env.local'];
+
+  for (const item of itemsToLink) {
+    const src = path.join(baseDir, item);
+    const dest = path.join(shadowDir, item);
+    if (!fs.existsSync(src)) continue;
+
+    if (fs.lstatSync(src).isDirectory()) {
+      if (createDirectoryJunction(src, dest)) {
+        linkedJunctions.push(dest);
+      }
+    } else {
+      try {
+        fs.copyFileSync(src, dest);
+      } catch {}
+    }
+  }
+  return linkedJunctions;
+}
+
 export function createShadowWorktree(baseDir: string, txId: string): ShadowWorktreeInstance {
   const shadowParent = path.join(baseDir, '.invar', 'shadow');
   const shadowDir = path.join(shadowParent, txId);
 
-  // Ensure clean directory
   if (fs.existsSync(shadowDir)) {
     destroyShadowWorktree(baseDir, shadowDir, []);
   }
   fs.mkdirSync(shadowParent, { recursive: true });
 
-  // Gotcha A: Snapshot uncommitted dirty working tree without modifying index
   let baseCommit = 'HEAD';
   let hasStashedState = false;
 
@@ -45,50 +84,11 @@ export function createShadowWorktree(baseDir: string, txId: string): ShadowWorkt
       baseCommit = stashSha;
       hasStashedState = true;
     }
-  } catch {
-    // Fall back to HEAD
-  }
+  } catch {}
 
-  // Create detached worktree
   runGit(['worktree', 'add', '--detach', `"${shadowDir}"`, baseCommit], baseDir);
-
-  // Copy untracked files so the agent sees brand-new uncommitted files
-  try {
-    const untracked = runGit(['ls-files', '--others', '--exclude-standard'], baseDir);
-    if (untracked) {
-      const files = untracked.split(/\r?\n/).filter(Boolean);
-      for (const relFile of files) {
-        const srcPath = path.join(baseDir, relFile);
-        const destPath = path.join(shadowDir, relFile);
-        if (fs.existsSync(srcPath) && !fs.lstatSync(srcPath).isDirectory()) {
-          fs.mkdirSync(path.dirname(destPath), { recursive: true });
-          fs.copyFileSync(srcPath, destPath);
-        }
-      }
-    }
-  } catch {
-    // Non-fatal
-  }
-
-  // Link node_modules and .env
-  const linkedJunctions: string[] = [];
-  const itemsToLink = ['node_modules', '.env', '.env.local'];
-
-  for (const item of itemsToLink) {
-    const src = path.join(baseDir, item);
-    const dest = path.join(shadowDir, item);
-    if (fs.existsSync(src)) {
-      if (fs.lstatSync(src).isDirectory()) {
-        if (createDirectoryJunction(src, dest)) {
-          linkedJunctions.push(dest);
-        }
-      } else {
-        try {
-          fs.copyFileSync(src, dest);
-        } catch {}
-      }
-    }
-  }
+  copyUntrackedFiles(baseDir, shadowDir);
+  const linkedJunctions = linkProjectDependencies(baseDir, shadowDir);
 
   return {
     txId,
@@ -104,15 +104,11 @@ export function destroyShadowWorktree(
   shadowDir: string,
   linkedJunctions: string[] = []
 ): void {
-  // Step 1: Unlink junctions first so git worktree remove doesn't touch node_modules
   for (const junction of linkedJunctions) {
     removeDirectoryJunction(junction);
   }
-
-  // Also check standard node_modules in shadowDir just in case
   removeDirectoryJunction(path.join(shadowDir, 'node_modules'));
 
-  // Step 2: Exponential backoff removal loop for Windows NTFS locking resilience
   const maxRetries = 3;
   const delays = [50, 150, 300];
 
@@ -122,9 +118,8 @@ export function destroyShadowWorktree(
         runGit(['worktree', 'remove', '--force', `"${shadowDir}"`], baseDir);
       }
       break;
-    } catch (err: any) {
+    } catch {
       if (attempt === maxRetries) {
-        // Last-resort fallback: force remove directory directly
         try {
           fs.rmSync(shadowDir, { recursive: true, force: true });
         } catch {
@@ -133,14 +128,11 @@ export function destroyShadowWorktree(
       } else {
         const delay = delays[attempt] || 100;
         const start = Date.now();
-        while (Date.now() - start < delay) {
-          // Micro-sleep
-        }
+        while (Date.now() - start < delay) {}
       }
     }
   }
 
-  // Step 3: Prune dangling worktree references
   try {
     runGit(['worktree', 'prune'], baseDir);
   } catch {}

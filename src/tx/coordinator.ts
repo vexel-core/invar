@@ -6,10 +6,12 @@ import { verifyVaultIntegrity } from '../vault/locker.js';
 import {
   createShadowWorktree,
   destroyShadowWorktree,
+  runGit,
   type ShadowWorktreeInstance,
 } from '../shadow/worktree.js';
 import { extractShadowDiff, applyShadowDiffToActiveTree } from '../shadow/merger.js';
 import { runLockedSuite } from '../gate/runner.js';
+import { evaluateAstInvariants } from '../gate/rules.js';
 import { captureActiveTreeStatus, detectActiveTreeEscape } from './escape.js';
 import { saveAuditLog } from '../audit/logger.js';
 
@@ -41,6 +43,23 @@ export function parkQuarantine(
   }
 
   return qDir;
+}
+
+export function getModifiedFiles(shadowDir: string, baseCommit: string): string[] {
+  try {
+    runGit(['add', '-A'], shadowDir);
+    const output = runGit(['diff', '--name-only', baseCommit], shadowDir);
+    if (!output || !output.trim()) {
+      return [];
+    }
+    return output
+      .split(/\r?\n/)
+      .map((f) => f.trim())
+      .filter((f) => f.length > 0)
+      .map((f) => path.join(shadowDir, f));
+  } catch {
+    return [];
+  }
 }
 
 export async function executeTransaction(
@@ -166,7 +185,37 @@ export async function executeTransaction(
       }
     }
 
-    // 8. All gates passed -> Atomic Commit!
+    // 8. Validate AST Architectural Invariants
+    log(`[invar] Validating AST architectural invariants...`);
+    const modifiedFiles = getModifiedFiles(shadow.shadowDir, shadow.baseCommit);
+    if (modifiedFiles.length > 0) {
+      const astResult = evaluateAstInvariants(shadow.shadowDir, modifiedFiles, config);
+      if (!astResult.passed) {
+        diff = extractShadowDiff(baseDir, shadow.shadowDir, shadow.baseCommit);
+        const qPath = parkQuarantine(
+          baseDir,
+          txId,
+          diff,
+          'ast_violation',
+          `AST architectural invariant violations detected:\n${astResult.violations.join('\n')}`
+        );
+
+        destroyShadowWorktree(baseDir, shadow.shadowDir, shadow.linkedJunctions);
+        return {
+          txId,
+          status: 'QUARANTINED',
+          success: false,
+          error: `AST Invariant Violation: Found ${astResult.violations.length} violations. Candidate diff quarantined at ${qPath}`,
+          preVaultRoot: preVault.rootHash,
+          postVaultRoot: vaultCheck.postVault.rootHash,
+          astViolations: astResult.violations,
+          quarantinePath: qPath,
+        };
+      }
+    }
+    log(`[invar] All AST architectural invariants satisfied.`);
+
+    // 9. All gates passed -> Atomic Commit!
     log(`[invar] All invariant gates passed! Applying atomic commit...`);
     diff = extractShadowDiff(baseDir, shadow.shadowDir, shadow.baseCommit);
     const merge = applyShadowDiffToActiveTree(baseDir, shadow.shadowDir, shadow.baseCommit);

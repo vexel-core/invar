@@ -4,10 +4,12 @@ import path from 'node:path';
 import chalk from 'chalk';
 import ora from 'ora';
 import { execSync } from 'node:child_process';
+import { globSync } from 'glob';
 import { loadConfig } from '../config/loader.js';
 import { detectTestRunner } from '../config/defaults.js';
 import { executeTransaction } from '../tx/coordinator.js';
 import { computeVaultState } from '../vault/hasher.js';
+import { evaluateAstInvariants } from '../gate/rules.js';
 import { runGit } from '../shadow/worktree.js';
 
 const program = new Command();
@@ -139,6 +141,33 @@ program
     console.log(`Locked Files: ${chalk.green(vault.fileCount)}`);
     console.log(`Merkle Root:  ${chalk.gray(vault.rootHash)}\n`);
     console.log(chalk.green('✔ Vault configuration is healthy.'));
+
+    // AST Invariant evaluation across source files
+    const sourceFiles = globSync('**/*.{ts,tsx,js,jsx,py}', {
+      cwd,
+      ignore: [
+        'node_modules/**',
+        'dist/**',
+        'bin/**',
+        '.invar/**',
+        'tests/**',
+        '**/*.spec.*',
+        '**/*.test.*',
+        '**/*.config.*',
+      ],
+      absolute: true,
+    });
+
+    const astResult = evaluateAstInvariants(cwd, sourceFiles, config);
+    if (!astResult.passed) {
+      console.log(chalk.red(`\n✖ AST Architectural Invariant Violations found (${astResult.violations.length}):`));
+      for (const v of astResult.violations) {
+        console.log(chalk.yellow(`  • ${v}`));
+      }
+      process.exit(1);
+    } else {
+      console.log(chalk.green(`✔ All AST architectural invariants satisfied (${sourceFiles.length} source files checked).\n`));
+    }
   });
 
 // Command: quarantine
