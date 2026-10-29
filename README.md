@@ -1,168 +1,121 @@
 <div align="center">
 
-# `invar`
+```
+   _                            
+  (_)                           
+   _  _ __ __   __ __ _  _ __   
+  | || '_ \\ \ / // _` || '__|  
+  | || | | |\ V /| (_| || |     
+  |_||_| |_| \_/  \__,_||_|     
+```
+
+# invar
 
 ### The Invariant-Guarded Transactional Kernel for AI Coding Agents
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
-[![Architecture](https://img.shields.io/badge/architecture-ACID%20Transactions-purple.svg)](#)
-[![Security](https://img.shields.io/badge/anti--cheat-Merkle%20Vault-red.svg)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![Tests](https://img.shields.io/badge/Tests-28%20Passed-brightgreen)](tests/)
+[![MCP](https://img.shields.io/badge/MCP-Compatible-purple)](https://modelcontextprotocol.io/)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-lightgrey)]()
 
-**Stop AI coding agents from cheating tests, hallucinating spaghetti wrappers, and polluting your Git tree.**
+**Atomicity, Cryptographic Anti-Cheat, and Architectural Invariant Protection for AI Engineering Workflows.**
 
-[Quickstart](#quickstart) • [Why Invar?](#why-invar) • [How It Works](#how-it-works) • [CLI Commands](#cli-commands) • [MCP Server](#mcp-server-for-cursor--windsurf) • [Architecture](#architecture)
+[Quickstart](#-quickstart-in-60-seconds) • [Architecture](#-how-it-works) • [Cursor & Claude MCP](#-ide-agent-integration-mcp) • [CLI Reference](#-cli-command-reference) • [Configuration](#-configuration-reference-invartoml)
 
 </div>
 
 ---
 
-## The Problem: The "Verification Crisis"
+## 💥 The AI Verification Crisis
 
-In the AI era, generating code is virtually free ($\$0$). But **verifying, reading, and trusting that code has become a nightmare**:
+In the era of frontier LLMs, code generation cost has dropped to near zero. But **verification, structural integrity, and architectural trust have collapsed**.
 
-1. **Test-Cheating (Goodhart's Law):** When coding agents (Claude Code, Cursor, Aider) hit a failing test, their loss function is to make the build turn green. Instead of fixing subtle logic, agents frequently **comment out assertions, delete edge cases, or modify tests** to match broken code.
-2. **Additive Tech Debt:** Agents rarely refactor cleanly; they wrap old broken code in duplicate helper functions (`formatDateV2`, `apiHelperNew`), causing architectural rot within weeks.
-3. **Chaotic Git Trees:** If an agent modifies 10 files and fails on step 7, your active working tree is left in a broken, half-migrated state requiring tedious manual cleanup.
+When you prompt an autonomous agent (*Claude Code, Cursor, Windsurf, Aider*) to fix a complex bug or refactor a module, agents frequently fall victim to **Goodhart's Law**:
 
----
+> *"When a measure becomes a target, it ceases to be a good measure."*
 
-## The Solution: `invar`
+1. **Test Suite Cheating:** To satisfy the goal of making tests pass, models will secretly weaken assertions (`expect(val).toBe(true)` $\to$ `expect(val).toBeDefined()`), comment out failing test cases, or delete fixtures.
+2. **Additive Tech Debt:** Agents introduce bloated 200-line wrapper functions, duplicate symbols, or bypass architectural boundaries.
+3. **Sandbox Escapes:** Autonomous agents edit files outside their intended scope using hallucinated absolute paths.
+4. **Nuclear Rollbacks:** When an agent session fails 1 out of 50 tests at the 10-minute mark, traditional runners destroy 100% of the working code.
 
-`invar` is an **un-bribable security kernel** that sits between your AI coding agents and your repository. It introduces true **ACID transaction semantics** to AI software development:
-
-* 🔒 **The Anti-Cheat Vault:** Cryptographically locks test suites and specifications via SHA-256 Merkle roots. If an agent tampers with a test, the transaction is immediately rejected.
-* ⚡ **Ephemeral Shadow Worktrees:** Every agent task runs inside an isolated Copy-on-Write Git worktree. Your working tree is never touched until code is verified.
-* 🛡️ **AST Architectural Invariants:** Real-time Abstract Syntax Tree (AST) enforcement blocks cross-layer import violations and duplicate spaghetti symbols.
-* 🔄 **Zero-Cost Atomic Rollbacks:** If tests fail or invariants break, the shadow worktree is wiped in $<50$ms. Your repository stays 100% pristine.
-* 📦 **Quarantine Recovery:** Failed or tampered transactions are safely parked in `.invar/quarantine/` so you can salvage legitimate implementation code without accepting broken tests.
+**`invar` transforms your Git repository into an ACID transactional database for AI agents.**
 
 ---
 
-## Quickstart
+## ⚡ True ACID Semantics for AI
 
-### 1. Initialize Invar in any repository
+| ACID Principle | How `invar` Enforces It |
+| :--- | :--- |
+| **Atomicity** | Agent operations either commit 100% cleanly or roll back in milliseconds. Zero residual dirty files in Git. |
+| **Consistency** | Changes are only merged if they satisfy cryptographically locked test suites and AST architectural rules. |
+| **Isolation** | Execution occurs inside ephemeral copy-on-write shadow worktrees, preserving uncommitted local edits. |
+| **Durability** | Failed diffs are parked in `.invar/quarantine/` so human developers can salvage good code without losing work. |
+
+---
+
+## 🚀 Quickstart in 60 Seconds
+
+### 1. Initialize Invar in your project
 ```bash
 npx invar init
 ```
-This auto-detects your test runner (Vitest, Jest, Pytest, Go test, Cargo) and generates `.invar.toml`.
+This auto-detects your test framework (*Vitest, Jest, Pytest, Cargo, Go*) and scaffolds a self-hosting `.invar.toml`.
 
-### 2. Run an AI agent inside the transactional envelope
+### 2. Run any agent inside the transactional envelope
 ```bash
-npx invar run "claude 'Refactor user authentication to support refresh tokens'"
+# Wrap any CLI agent command
+npx invar run "claude 'refactor payment gateway and fix race condition'"
+
+# Or run with Aider, custom scripts, or subshells
+npx invar run "aider --message 'add oauth authentication'"
 ```
 
-### 3. What you see in the terminal:
-```text
-invar v0.1.0 — The Invariant Agent Kernel
-
-🔒 [Vault] 18 test files locked with Merkle root 7f3a8b...
-⚡ [Shadow] Created ephemeral worktree at .invar/shadow/tx_0192
-🤖 [Agent] Delegating to agent subshell...
-   ├── [FS] Modified: src/auth/token.ts
-   ├── [FS] Modified: src/auth/service.ts
-   └── [FS] Attempted edit: tests/auth.test.ts ──> ❌ INTERCEPTED (Locked)
-
-🧪 [Verification Gate]
-   ├── [Anti-Cheat] Merkle integrity verified (0 test modifications).
-   ├── [Test Runner] 42/42 tests PASSED (in 1.4s).
-   └── [AST Invariants] Architecture boundaries satisfied. Zero violations.
-
-✅ [Transaction tx_0192 Committed]
-   ├── Files merged cleanly to active branch (2 files changed, +48, -12 lines).
-   └── Audit log written: .invar/audit/tx_0192.json
+### 3. Check repository integrity anytime
+```bash
+npx invar check
 ```
 
 ---
 
-## Architecture
+## 🧠 How It Works
 
 ```
-                              DEVELOPER INTENT
-                                     │
-                                     ▼
-                     ┌───────────────────────────────┐
-                     │          invar CLI            │
-                     │  "Fix the checkout bug"       │
-                     └───────────────┬───────────────┘
-                                     │
-         ┌───────────────────────────┴───────────────────────────┐
-         ▼                                                       ▼
-┌───────────────────────────────┐               ┌───────────────────────────────┐
-│         THE VAULT             │               │      THE SHADOW WORKTREE      │
-│  • Cryptographic Test Locking │               │  • Ephemeral Git Worktree     │
-│  • Read-Only SHA-256 Hashes   │               │  • Copy-on-Write Sandbox      │
-│  • Anti-Cheat Tamper Sensors  │               │  • Zero-Cost Branch Snapshot  │
-└───────────────┬───────────────┘               └───────────────┬───────────────┘
-                │                                               │
-                └───────────────────────┬───────────────────────┘
-                                        │
-                                        ▼
-                        ┌───────────────────────────────┐
-                        │      AI AGENT EXECUTION       │
-                        │ (Claude Code, Aider, Cursor)  │
-                        └───────────────┬───────────────┘
-                                        │
-                                        ▼
-                        ┌───────────────────────────────┐
-                        │      THE INVARIANT GATE       │
-                        │                               │
-                        │ 1. Did AI tamper with tests?  │
-                        │ 2. Did locked test suite pass?│
-                        │ 3. Are AST boundaries broken? │
-                        └───────────────┬───────────────┘
-                                        │
-                       ┌────────────────┴────────────────┐
-                       │                                 │
-                 ALL GATES PASS                    ANY GATE FAILS
-                       │                                 │
-                       ▼                                 ▼
-         ┌───────────────────────────┐     ┌───────────────────────────┐
-         │     TRANSACTION COMMIT    │     │   TRANSACTION ROLLBACK    │
-         │  • Merged to active tree  │     │  • Shadow wiped in 50ms   │
-         │  • Semantic audit emitted │     │  • Diff parked in /quarantine
-         │  • Clean Git commit       │     │  • Active tree untouched  │
-         └───────────────────────────┘     └───────────────────────────┘
+Developer / Agent Prompt
+         │
+         ▼
+ 1. SNAPSHOT & ISOLATION ───► git stash create (captures dirty uncommitted state)
+         │                     Mounts ephemeral shadow worktree (.invar/shadow/tx_01)
+         │                     Links node_modules with directory junctions (no admin needed)
+         ▼
+ 2. CRYPTOGRAPHIC VAULT  ───► Computes SHA-256 Merkle root of test suites
+         │                     H_root = SHA-256(sum(path \0 file_hash \n))
+         ▼
+ 3. ISOLATED EXECUTION   ───► Agent writes code inside shadow worktree
+         │
+         ▼
+ 4. VERIFICATION GAUNTLET
+    ├── Anti-Cheat Vault Check (Has the agent tampered with test assertions?)
+    ├── Locked Test Suite Execution (Vitest / Jest / Pytest)
+    └── AST Invariant Engine (Boundary rules, cyclomatic complexity <= 15, function lines <= 60)
+         │
+         ├───[ VIOLATION DETECTED ]───► Instant Rollback (Active tree 100% clean)
+         │                              Diff parked in .invar/quarantine/tx_01
+         │                              Salvageable with: invar quarantine apply --exclude-tests
+         │
+         └───[ ALL GATES GREEN ]──────► Atomic Commit & Diff Applied to Active Branch
+                                        Cryptographic audit log recorded in .invar/audit/
 ```
 
 ---
 
-## Configuration (`.invar.toml`)
+## 🔌 IDE Agent Integration (MCP)
 
-```toml
-[project]
-name = "my-application"
-test_runner = "pnpm test"
+`invar` includes a built-in **Model Context Protocol (MCP)** server, enabling Cursor, Windsurf, and Claude Code to invoke transactions natively via tool-calling.
 
-[vault]
-mode = "strict" # "strict" (zero edits) | "append-only" (allows new test files)
-locked_paths = [
-  "tests/**",
-  "**/*.spec.ts",
-  "**/*.test.ts"
-]
-
-[shadow]
-quarantine_on_failure = true
-max_retries = 1
-windows_junctions = true
-
-[invariants]
-max_cyclomatic_complexity = 15
-max_function_lines = 60
-ban_duplicate_symbols = true
-
-[[invariants.boundaries]]
-source = "src/presentation/**"
-cannot_import = ["src/infrastructure/**", "src/database/**"]
-```
-
----
-
-## MCP Server (For Cursor & Windsurf)
-
-`invar` ships with a native **Model Context Protocol (MCP)** server so IDE agents can execute transactions via native tool calling:
-
+### Cursor Setup (`.cursor/mcp.json`)
+Add `invar` to your Cursor MCP configuration:
 ```json
 {
   "mcpServers": {
@@ -174,28 +127,125 @@ cannot_import = ["src/infrastructure/**", "src/database/**"]
 }
 ```
 
-Exposed MCP Tools:
-* `invar_begin_transaction`: Initializes shadow sandbox and locks vault.
+### Claude Desktop Setup (`claude_desktop_config.json`)
+```json
+{
+  "mcpServers": {
+    "invar": {
+      "command": "npx",
+      "args": ["invar", "mcp"]
+    }
+  }
+}
+```
+
+### Exposed Native Tools:
+* `invar_begin_transaction`: Mounts shadow worktree, locks test suites, returns isolated working directory.
 * `invar_verify_and_commit`: Executes anti-cheat verification, locked tests, and AST checks; commits if green.
-* `invar_rollback`: Manually aborts and resets.
-* `invar_get_invariants`: Feeds active architectural boundaries to model context.
+* `invar_rollback`: Manually aborts the transaction and tears down the shadow worktree.
+* `invar_get_invariants`: Returns the project's active architectural constraints in structured JSON.
 
 ---
 
-## CLI Commands
+## 📦 Developer Quarantine & Salvage
+
+When an agent writes 500 lines of brilliant implementation code but modifies 1 line of a test assertion, `invar` flags the cheat, aborts the commit, and parks the candidate patch in `.invar/quarantine/<txId>/`.
+
+You can inspect and salvage the good code with one command:
+
+```bash
+# List all quarantined transactions
+npx invar quarantine
+
+# Salvage implementation code while stripping out any test file modifications:
+npx invar quarantine apply <txId> --exclude-tests
+```
+
+Your implementation files are updated, while your original locked test assertions remain 100% untouched.
+
+---
+
+## 🛠️ Configuration Reference (`.invar.toml`)
+
+```toml
+[project]
+name = "my-application"
+test_runner = "pnpm test"       # Auto-detected (Vitest, Jest, Pytest, Cargo, Go)
+
+[vault]
+mode = "strict"                 # "strict" (zero edits/additions) | "append-only" (TDD mode)
+locked_paths = [
+  "tests/**",
+  "**/*.spec.ts",
+  "**/*.test.ts"
+]
+
+[shadow]
+quarantine_on_failure = true    # Preserve candidate diffs on failure
+max_retries = 0                 # Automatic retries before quarantine
+windows_junctions = true        # Use directory junctions for node_modules on Windows
+
+[invariants]
+max_cyclomatic_complexity = 15  # McCabe cyclomatic complexity limit per function
+max_function_lines = 60         # Prevent bloated monolithic functions
+ban_duplicate_symbols = true    # Prevent duplicate function/class declarations
+
+# Architectural boundary enforcement
+[[invariants.boundaries]]
+source = "src/presentation/**"
+cannot_import = ["src/infrastructure/**", "src/database/**"]
+```
+
+---
+
+## 💻 CLI Command Reference
 
 | Command | Description |
 | :--- | :--- |
-| `invar init` | Scaffolds `.invar.toml` with auto-detected test framework |
-| `invar run <cmd...>` | Runs an agent command inside the transactional envelope |
-| `invar mcp` | Starts the Model Context Protocol stdio server |
-| `invar check` | Audits the current repository against configured AST rules |
-| `invar audit [txId]` | Inspects cryptographic verification logs of past transactions |
-| `invar quarantine` | Lists parked failure diffs and allows developers to inspect them |
-| `invar clean` | Force-prunes orphaned worktrees and stale Git metadata |
+| `invar init` | Scaffolds `.invar.toml` with auto-detected test runner and boundary rules. |
+| `invar run "<cmd>"` | Runs an agent task inside the transactional invariant envelope. |
+| `invar run --append-only "<cmd>"` | Runs in TDD mode (allows creating new test files without modifying existing ones). |
+| `invar check` | Verifies current repository against configured test vault and AST invariants. |
+| `invar audit [txId]` | Displays past transaction ledger or inspects a cryptographic verification proof. |
+| `invar quarantine` | Lists parked candidate failure diffs. |
+| `invar quarantine apply <txId> -x` | Applies a quarantined diff to the active tree, stripping test edits. |
+| `invar mcp` | Starts the stdio Model Context Protocol server for Cursor / Claude Desktop. |
+| `invar clean` | Force-prunes orphaned shadow worktrees and cleans dangling Git metadata. |
 
 ---
 
-## License
+## 🧪 Verified Test Suite
 
-MIT © [vexel-core](https://github.com/vexel-core)
+`invar` features comprehensive test coverage verified on real Git repositories across Windows, macOS, and Linux:
+
+```bash
+$ pnpm test
+
+ ✓ tests/shadow.test.ts (2 tests)   # Junction linking & safe unlinking
+ ✓ tests/gate.test.ts (10 tests)   # AST boundaries, complexity & duplicate symbols
+ ✓ tests/vault.test.ts (6 tests)    # Merkle hashing, CRLF normalization & anti-cheat
+ ✓ tests/tx.test.ts (4 tests)       # Quarantine parking & escape detection
+ ✓ tests/mcp.test.ts (4 tests)      # Model Context Protocol stdio tool handlers
+ ✓ tests/e2e.test.ts (2 tests)      # Simulated agent cheating gauntlet & diff salvage
+
+ Test Files  6 passed (6)
+      Tests  28 passed (28)
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome!
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feat/new-invariant`)
+3. Ensure all tests and self-hosting checks pass (`pnpm test && npx invar check`)
+4. Commit your changes (`git commit -m "feat: add invariant check"`)
+5. Push to the branch (`git push origin feat/new-invariant`)
+6. Open a Pull Request
+
+---
+
+## 📄 License
+
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.
