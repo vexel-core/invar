@@ -1,0 +1,29 @@
+[project]
+name = "invar"
+test_runner = "pnpm test"
+
+[vault]
+mode = "strict"
+locked_paths = [
+  "tests/**",
+  "**/*.spec.ts",
+  "**/*.test.ts"
+]
+
+[shadow]
+quarantine_on_failure = true
+max_retries = 0
+windows_junctions = true
+
+[invariants]
+max_cyclomatic_complexity = 15
+max_function_lines = 60
+ban_duplicate_symbols = true
+
+[[invariants.boundaries]]
+source = "src/vault/**"
+cannot_import = ["src/shadow/**", "src/tx/**"]
+
+[[invariants.boundaries]]
+source = "src/config/**"
+cannot_import = ["src/vault/**", "src/shadow/**", "src/tx/**", "src/gate/**"]
