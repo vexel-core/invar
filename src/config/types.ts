@@ -37,6 +37,32 @@ export interface SemanticDiffResult {
   violations: string[];
 }
 
+export type MutationOperatorKind = 'ROR' | 'LCR' | 'RVM' | 'AOR';
+
+export interface MicroMutant {
+  id: string;
+  filePath: string;
+  line: number;
+  operator: MutationOperatorKind;
+  originalText: string;
+  mutatedText: string;
+  startPos: number;
+  endPos: number;
+}
+
+export interface MutationProofResult {
+  totalMutants: number;
+  killedMutants: number;
+  survivedMutants: number;
+  isLoadBearing: boolean;
+  mutants: {
+    mutant: MicroMutant;
+    killed: boolean;
+    failureMessage?: string;
+  }[];
+  violations: string[];
+}
+
 export interface BoundaryRule {
   source: string;
   cannot_import: string[];

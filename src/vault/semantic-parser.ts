@@ -97,7 +97,7 @@ function extractAssertAssertion(
 
 function findAssertionsInNode(node: ts.Node, sourceFile: ts.SourceFile): SemanticAssertion[] {
   const assertions: SemanticAssertion[] = [];
-  function visit(n: ts.Node) {
+  function visitAssertionNode(n: ts.Node) {
     if (ts.isCallExpression(n)) {
       const expAss = extractExpectAssertion(n, sourceFile);
       if (expAss) {
@@ -107,9 +107,9 @@ function findAssertionsInNode(node: ts.Node, sourceFile: ts.SourceFile): Semanti
         if (asstAss) assertions.push(asstAss);
       }
     }
-    ts.forEachChild(n, visit);
+    ts.forEachChild(n, visitAssertionNode);
   }
-  visit(node);
+  visitAssertionNode(node);
   return assertions;
 }
 
