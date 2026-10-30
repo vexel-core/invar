@@ -63,6 +63,42 @@ export interface MutationProofResult {
   violations: string[];
 }
 
+export type TaskProfileName = 'bugfix' | 'feature' | 'refactor' | 'contract-migration';
+
+export interface TaskProfileConfig {
+  name: TaskProfileName;
+  vault_mode: VaultMode;
+  allow_test_additions: boolean;
+  allow_test_modifications: boolean;
+  enforce_mutation_proof: boolean;
+  freeze_public_exports?: boolean;
+  require_assertion_diff_review?: boolean;
+}
+
+export type TransitionEntryType =
+  | 'UPGRADED'
+  | 'DOWNGRADED'
+  | 'VALUE_MODIFIED'
+  | 'TARGET_MODIFIED'
+  | 'DELETED'
+  | 'ADDED';
+
+export interface TransitionMatrixEntry {
+  filePath: string;
+  blockId: string;
+  preAssertion: string;
+  postAssertion: string;
+  preStrength: number;
+  postStrength: number;
+  type: TransitionEntryType;
+}
+
+export interface AssertionTransitionMatrix {
+  entries: TransitionMatrixEntry[];
+  hasBreakingChanges: boolean;
+  summary: string;
+}
+
 export interface BoundaryRule {
   source: string;
   cannot_import: string[];
@@ -88,6 +124,7 @@ export interface InvarConfig {
     ban_duplicate_symbols?: boolean;
     boundaries?: BoundaryRule[];
   };
+  profiles?: Partial<Record<TaskProfileName, Partial<TaskProfileConfig>>>;
 }
 
 export interface FileHashManifest {
@@ -131,4 +168,7 @@ export interface TransactionResult {
   astViolations?: string[];
   diff?: string;
   quarantinePath?: string;
+  activeProfile?: TaskProfileName;
+  mutationProof?: MutationProofResult;
+  transitionMatrix?: AssertionTransitionMatrix;
 }

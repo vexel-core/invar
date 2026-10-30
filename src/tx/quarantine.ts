@@ -3,9 +3,16 @@ import path from 'node:path';
 import { runGit } from '../shadow/worktree.js';
 import { minimatch } from 'minimatch';
 
+export type QuarantineStatus =
+  | 'tampered'
+  | 'test_failure'
+  | 'ast_violation'
+  | 'placebo_test'
+  | 'user_aborted';
+
 export interface QuarantineManifest {
   txId: string;
-  status: 'tampered' | 'test_failure' | 'ast_violation' | 'user_aborted';
+  status: QuarantineStatus;
   reason: string;
   timestamp: string;
 }
@@ -14,7 +21,7 @@ export function parkQuarantine(
   baseDir: string,
   txId: string,
   diff: string,
-  status: 'tampered' | 'test_failure' | 'ast_violation' | 'user_aborted',
+  status: QuarantineStatus,
   reason: string
 ): string {
   const qDir = path.join(baseDir, '.invar', 'quarantine', txId);

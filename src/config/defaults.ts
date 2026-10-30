@@ -1,6 +1,64 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { InvarConfig } from './types.js';
+import type { InvarConfig, TaskProfileConfig, TaskProfileName } from './types.js';
+
+export const DEFAULT_PROFILES: Record<TaskProfileName, TaskProfileConfig> = {
+  bugfix: {
+    name: 'bugfix',
+    vault_mode: 'strict',
+    allow_test_additions: false,
+    allow_test_modifications: false,
+    enforce_mutation_proof: false,
+    freeze_public_exports: false,
+    require_assertion_diff_review: false,
+  },
+  feature: {
+    name: 'feature',
+    vault_mode: 'semantic',
+    allow_test_additions: true,
+    allow_test_modifications: false,
+    enforce_mutation_proof: true,
+    freeze_public_exports: false,
+    require_assertion_diff_review: false,
+  },
+  refactor: {
+    name: 'refactor',
+    vault_mode: 'strict',
+    allow_test_additions: false,
+    allow_test_modifications: false,
+    enforce_mutation_proof: false,
+    freeze_public_exports: true,
+    require_assertion_diff_review: false,
+  },
+  'contract-migration': {
+    name: 'contract-migration',
+    vault_mode: 'semantic',
+    allow_test_additions: true,
+    allow_test_modifications: true,
+    enforce_mutation_proof: false,
+    freeze_public_exports: false,
+    require_assertion_diff_review: true,
+  },
+};
+
+export function resolveProfile(
+  config: InvarConfig,
+  profileName?: TaskProfileName | string
+): TaskProfileConfig {
+  const chosenName: TaskProfileName =
+    profileName && (profileName in DEFAULT_PROFILES)
+      ? (profileName as TaskProfileName)
+      : 'bugfix';
+
+  const defaultProfile = DEFAULT_PROFILES[chosenName];
+  const customProfile = config.profiles?.[chosenName] || {};
+
+  return {
+    ...defaultProfile,
+    ...customProfile,
+    name: chosenName,
+  };
+}
 
 export function detectTestRunner(cwd: string): string {
   // Check for Node/TS test frameworks

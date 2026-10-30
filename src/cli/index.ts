@@ -66,9 +66,10 @@ function runAgentSubprocess(cmdString: string, shadowDir: string): void {
 program
   .command('run <command...>')
   .description('Execute an agent task inside the transactional invariant envelope')
+  .option('-p, --profile <profile>', 'Task-aware invariant profile (bugfix, feature, refactor, contract-migration)')
   .option('-s, --strict', 'Force strict vault mode (no test additions allowed)')
   .option('-a, --append-only', 'Allow new test files to be created (TDD mode)')
-  .action(async (commandParts: string[], options: { strict?: boolean; appendOnly?: boolean }) => {
+  .action(async (commandParts: string[], options: { strict?: boolean; appendOnly?: boolean; profile?: any }) => {
     printBanner();
     const cwd = process.cwd();
     const config = loadConfig(cwd);
@@ -87,6 +88,7 @@ program
       },
       {
         intent: cmdString,
+        profile: options.profile,
         onLog: (msg) => { spinner.setText(msg); },
       }
     );
