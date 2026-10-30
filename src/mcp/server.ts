@@ -20,6 +20,7 @@ import { captureActiveTreeStatus, detectActiveTreeEscape } from '../tx/escape.js
 import { parkQuarantine } from '../tx/quarantine.js';
 import { saveAuditLog } from '../audit/logger.js';
 import { getModifiedFiles } from '../tx/coordinator.js';
+import { handleValidateIncremental } from './supervisor.js';
 
 export interface ActiveMcpSession {
   txId: string;
@@ -256,6 +257,17 @@ const INVAR_MCP_TOOLS = [
       },
     },
   },
+  {
+    name: 'invar_validate_incremental',
+    description: 'Performs fast (<50ms) incremental validation of AST complexity, boundary rules, and test preservation on the active shadow worktree. Returns structured diagnostics to self-heal code before requesting final commit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        txId: { type: 'string', description: 'Active transaction ID to incrementally validate.' },
+      },
+      required: ['txId'],
+    },
+  },
 ];
 
 export function createInvarMcpServer(defaultBaseDir?: string): Server {
@@ -276,6 +288,14 @@ export function createInvarMcpServer(defaultBaseDir?: string): Server {
     if (name === 'invar_verify_and_commit') return handleVerifyAndCommit(normalizedArgs as any);
     if (name === 'invar_rollback') return handleRollback(normalizedArgs as any);
     if (name === 'invar_get_invariants') return handleGetInvariants(normalizedArgs);
+    if (name === 'invar_validate_incremental') {
+      const txId = (normalizedArgs as any).txId;
+      const session = activeMcpSessions.get(txId);
+      if (!session) {
+        return { content: [{ type: 'text', text: `No active transaction found with ID: ${txId}` }], isError: true };
+      }
+      return handleValidateIncremental(session);
+    }
 
     return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
   });

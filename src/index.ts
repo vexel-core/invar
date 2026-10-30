@@ -19,6 +19,7 @@ export * from './tx/quarantine.js';
 export * from './tx/escape.js';
 export * from './audit/logger.js';
 export * from './mcp/server.js';
+export * from './mcp/supervisor.js';
 export * from './ui/banner.js';
 export * from './ui/formatters.js';
 export * from './ui/spinner.js';
