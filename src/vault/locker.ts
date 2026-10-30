@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { VaultMode, VaultState } from '../config/types.js';
 import { computeVaultState } from './hasher.js';
+import { diffSemanticBlocks } from './semantic-parser.js';
 
 export interface VaultVerificationResult {
   verified: boolean;
@@ -9,6 +10,52 @@ export interface VaultVerificationResult {
   error?: string;
   violations: string[];
   postVault: VaultState;
+}
+
+function checkPreExistingPaths(
+  preVault: VaultState,
+  postVault: VaultState,
+  mode: VaultMode,
+  violations: string[]
+): void {
+  for (const relPath of Object.keys(preVault.manifest)) {
+    const expectedHash = preVault.manifest[relPath];
+    const actualHash = postVault.manifest[relPath];
+
+    if (!actualHash) {
+      violations.push(`[DELETED] Locked test file removed: ${relPath}`);
+      continue;
+    }
+    if (actualHash === expectedHash) continue;
+
+    if (mode === 'semantic') {
+      const preBlocks = preVault.semanticSnapshots?.[relPath];
+      const postBlocks = postVault.semanticSnapshots?.[relPath];
+      if (preBlocks && postBlocks) {
+        const diff = diffSemanticBlocks(preBlocks, postBlocks, relPath);
+        if (!diff.isValidAdditive) {
+          violations.push(...diff.violations);
+        }
+        continue;
+      }
+    }
+    violations.push(`[MODIFIED] Test file content altered: ${relPath}`);
+  }
+}
+
+function checkNewPaths(
+  preVault: VaultState,
+  postVault: VaultState,
+  mode: VaultMode,
+  violations: string[]
+): void {
+  for (const relPath of Object.keys(postVault.manifest)) {
+    if (!preVault.manifest[relPath]) {
+      if (mode === 'strict') {
+        violations.push(`[ADDED] New test file added under strict mode: ${relPath}`);
+      }
+    }
+  }
 }
 
 export function verifyVaultIntegrity(
@@ -20,29 +67,8 @@ export function verifyVaultIntegrity(
   const postVault = computeVaultState(shadowDir, lockedPatterns);
   const violations: string[] = [];
 
-  const prePaths = Object.keys(preVault.manifest);
-  const postPaths = Object.keys(postVault.manifest);
-
-  // Check 1: Did any pre-existing test file get modified or deleted?
-  for (const relPath of prePaths) {
-    const expectedHash = preVault.manifest[relPath];
-    const actualHash = postVault.manifest[relPath];
-
-    if (!actualHash) {
-      violations.push(`[DELETED] Locked test file removed: ${relPath}`);
-    } else if (actualHash !== expectedHash) {
-      violations.push(`[MODIFIED] Test file content altered: ${relPath}`);
-    }
-  }
-
-  // Check 2: Were any new test files added?
-  for (const relPath of postPaths) {
-    if (!preVault.manifest[relPath]) {
-      if (mode === 'strict') {
-        violations.push(`[ADDED] New test file added under strict mode: ${relPath}`);
-      }
-    }
-  }
+  checkPreExistingPaths(preVault, postVault, mode, violations);
+  checkNewPaths(preVault, postVault, mode, violations);
 
   if (violations.length > 0) {
     return {

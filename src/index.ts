@@ -3,6 +3,7 @@ export * from './config/loader.js';
 export * from './config/defaults.js';
 export * from './vault/hasher.js';
 export * from './vault/locker.js';
+export * from './vault/semantic-parser.js';
 export * from './shadow/junction.js';
 export * from './shadow/worktree.js';
 export * from './shadow/merger.js';

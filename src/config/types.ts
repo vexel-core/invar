@@ -1,4 +1,41 @@
-export type VaultMode = 'strict' | 'append-only';
+export type VaultMode = 'strict' | 'append-only' | 'semantic';
+
+export interface SemanticAssertion {
+  matcher: string;
+  line: number;
+  targetExpr: string;
+  expectedExpr?: string;
+}
+
+export interface SemanticTestBlock {
+  id: string;
+  name: string;
+  kind: 'it' | 'test';
+  suiteHierarchy: string[];
+  line: number;
+  assertions: SemanticAssertion[];
+  bodyText?: string;
+}
+
+export interface SemanticFileAnalysis {
+  filePath: string;
+  blocks: SemanticTestBlock[];
+}
+
+export interface SemanticDiffResult {
+  filePath: string;
+  preservedBlocks: SemanticTestBlock[];
+  addedBlocks: SemanticTestBlock[];
+  removedBlocks: SemanticTestBlock[];
+  modifiedBlocks: {
+    blockId: string;
+    pre: SemanticTestBlock;
+    post: SemanticTestBlock;
+    reason: string;
+  }[];
+  isValidAdditive: boolean;
+  violations: string[];
+}
 
 export interface BoundaryRule {
   source: string;
@@ -36,6 +73,7 @@ export interface VaultState {
   manifest: FileHashManifest;
   lockedAt: string;
   fileCount: number;
+  semanticSnapshots?: Record<string, SemanticTestBlock[]>;
 }
 
 export type TransactionStatus =
