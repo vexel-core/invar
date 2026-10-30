@@ -5,6 +5,7 @@ import type {
   SemanticFileAnalysis,
   SemanticTestBlock,
 } from '../config/types.js';
+import { compareAssertionLists, isTautologicalAssertion } from './assertion-diff.js';
 
 interface CallClassification {
   type: 'suite' | 'test' | 'unknown';
@@ -177,28 +178,13 @@ export function parseTestFile(code: string, fileName = 'test.ts'): SemanticFileA
   return { filePath: fileName, blocks };
 }
 
-function compareAssertions(
+function evaluateBlockAssertions(
   preAssertions: SemanticAssertion[],
   postAssertions: SemanticAssertion[],
   blockId: string
-): string | null {
-  if (postAssertions.length < preAssertions.length) {
-    return `[ASSERTION_DELETED] Block "${blockId}" assertions reduced from ${preAssertions.length} to ${postAssertions.length}`;
-  }
-  for (let i = 0; i < preAssertions.length; i++) {
-    const pre = preAssertions[i];
-    const post = postAssertions[i];
-    if (pre.matcher !== post.matcher && !post.matcher.includes(pre.matcher)) {
-      return `[ASSERTION_TAMPERED] Block "${blockId}" matcher changed from "${pre.matcher}" to "${post.matcher}"`;
-    }
-    if (pre.targetExpr !== post.targetExpr) {
-      return `[ASSERTION_TAMPERED] Block "${blockId}" target expression altered from "${pre.targetExpr}" to "${post.targetExpr}"`;
-    }
-    if (pre.expectedExpr !== post.expectedExpr) {
-      return `[ASSERTION_TAMPERED] Block "${blockId}" expected value altered from "${pre.expectedExpr}" to "${post.expectedExpr}"`;
-    }
-  }
-  return null;
+): string[] {
+  const diff = compareAssertionLists(preAssertions, postAssertions, blockId);
+  return diff.violations;
 }
 
 export function diffSemanticBlocks(
@@ -221,10 +207,10 @@ export function diffSemanticBlocks(
       removedBlocks.push(pre);
       violations.push(`[DELETED_TEST] Existing test block removed or renamed: "${pre.id}"`);
     } else {
-      const tamperReason = compareAssertions(pre.assertions, post.assertions, pre.id);
-      if (tamperReason) {
-        violations.push(tamperReason);
-        modifiedBlocks.push({ blockId: pre.id, pre, post, reason: tamperReason });
+      const blockViolations = evaluateBlockAssertions(pre.assertions, post.assertions, pre.id);
+      if (blockViolations.length > 0) {
+        violations.push(...blockViolations);
+        modifiedBlocks.push({ blockId: pre.id, pre, post, reason: blockViolations.join('; ') });
       } else {
         preservedBlocks.push(post);
       }
@@ -234,6 +220,13 @@ export function diffSemanticBlocks(
   for (const post of postBlocks) {
     if (!preMap.has(post.id)) {
       addedBlocks.push(post);
+      for (const assertion of post.assertions) {
+        if (isTautologicalAssertion(assertion)) {
+          violations.push(
+            `[TAUTOLOGICAL_ASSERTION] Block "${post.id}" contains tautological assertion: ${assertion.targetExpr}.${assertion.matcher}`
+          );
+        }
+      }
     }
   }
 
