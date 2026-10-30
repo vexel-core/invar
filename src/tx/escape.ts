@@ -1,4 +1,6 @@
+import { minimatch } from 'minimatch';
 import { runGit } from '../shadow/worktree.js';
+import { DEFAULT_ARTIFACT_IGNORE } from '../config/defaults.js';
 
 export interface EscapeCheckResult {
   escaped: boolean;
@@ -7,16 +9,48 @@ export interface EscapeCheckResult {
 
 export function captureActiveTreeStatus(baseDir: string): string[] {
   try {
-    const raw = runGit(['status', '--porcelain'], baseDir);
+    const raw = runGit(['status', '--porcelain', '-uall'], baseDir);
     return raw ? raw.split(/\r?\n/).filter(Boolean) : [];
   } catch {
     return [];
   }
 }
 
+export function extractPathFromPorcelainLine(line: string): string {
+  const rawPath = line.length > 3 ? line.slice(3).trim() : line.trim();
+  const target = rawPath.includes(' -> ') ? rawPath.split(' -> ').pop()!.trim() : rawPath;
+  const unquoted = target.replace(/^"(.*)"$/, '$1');
+  return unquoted.replace(/\\/g, '/').replace(/^\.\//, '');
+}
+
+export function isArtifactIgnored(
+  filePath: string,
+  ignorePatterns: string[] = DEFAULT_ARTIFACT_IGNORE
+): boolean {
+  const normalized = filePath.replace(/\\/g, '/').replace(/^\.\//, '');
+  if (normalized.startsWith('.invar/') || normalized.includes('/.invar/')) {
+    return true;
+  }
+
+  for (const pattern of ignorePatterns) {
+    if (!pattern) continue;
+    if (minimatch(normalized, pattern, { dot: true })) {
+      return true;
+    }
+    if (!pattern.startsWith('**/')) {
+      if (minimatch(normalized, `**/${pattern}`, { dot: true })) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export function detectActiveTreeEscape(
   baseDir: string,
-  initialStatus: string[]
+  initialStatus: string[],
+  ignorePatterns: string[] = DEFAULT_ARTIFACT_IGNORE
 ): EscapeCheckResult {
   const currentStatus = captureActiveTreeStatus(baseDir);
 
@@ -24,13 +58,14 @@ export function detectActiveTreeEscape(
   const unauthorized: string[] = [];
 
   for (const line of currentStatus) {
-    // Ignore .invar internal directories
-    if (line.includes('.invar/')) {
+    if (initialSet.has(line)) {
       continue;
     }
-    if (!initialSet.has(line)) {
-      unauthorized.push(line);
+    const filePath = extractPathFromPorcelainLine(line);
+    if (isArtifactIgnored(filePath, ignorePatterns)) {
+      continue;
     }
+    unauthorized.push(line);
   }
 
   return {

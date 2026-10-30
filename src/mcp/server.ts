@@ -85,7 +85,11 @@ async function verifyAndCommitChecks(
 ): Promise<{ passed: boolean; error?: string; status?: 'tampered' | 'test_failure' | 'ast_violation'; postVault?: VaultState }> {
   const { baseDir, shadow, preVault, initialActiveStatus, config } = session;
 
-  const escapeCheck = detectActiveTreeEscape(baseDir, initialActiveStatus);
+  const escapeCheck = detectActiveTreeEscape(
+    baseDir,
+    initialActiveStatus,
+    config.artifacts?.ignore_escape
+  );
   if (escapeCheck.escaped) {
     return {
       passed: false,

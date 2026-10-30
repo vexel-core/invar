@@ -271,7 +271,11 @@ export async function executeTransaction(
     log(`[invar] Executing agent task inside shadow worktree...`);
     await agentExecutor(shadow.shadowDir);
 
-    const escapeCheck = detectActiveTreeEscape(baseDir, initialActiveStatus);
+    const escapeCheck = detectActiveTreeEscape(
+      baseDir,
+      initialActiveStatus,
+      config.artifacts?.ignore_escape
+    );
     if (escapeCheck.escaped) {
       const diff = extractShadowDiff(baseDir, shadow.shadowDir, shadow.baseCommit);
       const qPath = parkQuarantine(

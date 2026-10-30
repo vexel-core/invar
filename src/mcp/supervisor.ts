@@ -59,7 +59,11 @@ function collectIncrementalIssues(session: ActiveMcpSession, modified: string[])
   const issues: SupervisorIssue[] = [];
   const { baseDir, shadow, initialActiveStatus, config, preVault } = session;
 
-  const escapeCheck = detectActiveTreeEscape(baseDir, initialActiveStatus);
+  const escapeCheck = detectActiveTreeEscape(
+    baseDir,
+    initialActiveStatus,
+    config.artifacts?.ignore_escape
+  );
   if (escapeCheck.escaped) {
     issues.push({
       type: 'escape',

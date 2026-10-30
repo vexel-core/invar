@@ -124,6 +124,9 @@ export interface InvarConfig {
     ban_duplicate_symbols?: boolean;
     boundaries?: BoundaryRule[];
   };
+  artifacts?: {
+    ignore_escape?: string[];
+  };
   profiles?: Partial<Record<TaskProfileName, Partial<TaskProfileConfig>>>;
 }
 

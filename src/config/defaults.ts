@@ -95,6 +95,18 @@ export function detectTestRunner(cwd: string): string {
   return '';
 }
 
+export const DEFAULT_ARTIFACT_IGNORE: string[] = [
+  'dist/**',
+  '.next/**',
+  'coverage/**',
+  'generated/**',
+  'build/**',
+  '.turbo/**',
+  'out/**',
+  '.nuxt/**',
+  '*.tsbuildinfo',
+];
+
 export function getDefaultConfig(cwd: string): InvarConfig {
   const detectedRunner = detectTestRunner(cwd);
   const projectName = path.basename(path.resolve(cwd)) || 'invar-project';
@@ -124,6 +136,9 @@ export function getDefaultConfig(cwd: string): InvarConfig {
       max_function_lines: 60,
       ban_duplicate_symbols: true,
       boundaries: [],
+    },
+    artifacts: {
+      ignore_escape: [...DEFAULT_ARTIFACT_IGNORE],
     },
   };
 }

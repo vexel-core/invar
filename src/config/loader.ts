@@ -51,5 +51,14 @@ function mergeConfigs(defaults: InvarConfig, custom: Partial<InvarConfig>): Inva
       ...defaults.invariants,
       ...custom.invariants,
     },
+    artifacts: {
+      ...defaults.artifacts,
+      ...custom.artifacts,
+      ignore_escape: custom.artifacts?.ignore_escape ?? defaults.artifacts?.ignore_escape ?? [],
+    },
+    profiles: {
+      ...defaults.profiles,
+      ...custom.profiles,
+    },
   };
 }

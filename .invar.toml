@@ -15,6 +15,16 @@ quarantine_on_failure = true
 max_retries = 0
 windows_junctions = true
 
+[artifacts]
+ignore_escape = [
+  "dist/**",
+  ".next/**",
+  "coverage/**",
+  "generated/**",
+  "build/**",
+  ".turbo/**"
+]
+
 [invariants]
 max_cyclomatic_complexity = 15
 max_function_lines = 60
