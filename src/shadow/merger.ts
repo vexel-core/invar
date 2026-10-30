@@ -16,10 +16,10 @@ export function extractShadowDiff(baseDir: string, shadowDir: string, baseCommit
     if (status) {
       runGit(['commit', '-m', 'invar: shadow transaction candidate'], shadowDir);
     }
-    return runGitRaw(['diff', baseCommit, 'HEAD'], shadowDir);
+    return runGitRaw(['diff', baseCommit, 'HEAD', '--', '.', '":(exclude).invar"'], shadowDir);
   } catch {
     try {
-      return runGitRaw(['diff', baseCommit], shadowDir);
+      return runGitRaw(['diff', baseCommit, '--', '.', '":(exclude).invar"'], shadowDir);
     } catch {
       return '';
     }

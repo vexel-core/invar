@@ -17,6 +17,9 @@ function isSourceCodeFile(relPath: string): boolean {
   const normalized = relPath.replace(/\\/g, '/');
   if (/(^|\/)(tests?|__tests__|spec)\//i.test(normalized)) return false;
   if (/\.(test|spec)\.[cm]?[jt]sx?$/i.test(normalized)) return false;
+  if (/(^|\/)(scripts|\.invar|dist|\.next|node_modules)\//i.test(normalized)) return false;
+  if (/\.config\.[cm]?[jt]sx?$/i.test(normalized)) return false;
+  if (!normalized.includes('/') && /^(agent|build|setup|test|run)/i.test(normalized)) return false;
   return /\.[cm]?[jt]sx?$/i.test(normalized);
 }
 

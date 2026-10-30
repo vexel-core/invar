@@ -84,7 +84,7 @@ export function filterDiffExcludingTests(
     return { filteredDiff: '', excludedFiles: [], includedFiles: [] };
   }
 
-  const fileDiffs = diff.split(/(?=diff --git )/);
+  const fileDiffs = diff.split(/(?=^diff --git )/m);
   const includedHunks: string[] = [];
   const excludedFiles: string[] = [];
   const includedFiles: string[] = [];
@@ -95,6 +95,9 @@ export function filterDiffExcludingTests(
     const match = fileDiff.match(/^diff --git a\/(.+?) b\/(.+?)(?:\r?\n|$)/);
     if (match) {
       const filePath = match[2];
+      if (filePath.startsWith('.invar/') || filePath.startsWith('.invar\\')) {
+        continue;
+      }
       const isTestFile = testPatterns.some((pattern) => minimatch(filePath, pattern));
 
       if (isTestFile) {
@@ -150,7 +153,8 @@ export function applyQuarantinedDiff(
 
   const tempPatchFile = path.join(baseDir, '.invar', `apply_salvage_${Date.now()}.patch`);
   try {
-    fs.writeFileSync(tempPatchFile, patchToApply, 'utf8');
+    const normalizedPatch = (patchToApply.endsWith('\n') ? patchToApply : `${patchToApply}\n`).replace(/\r\n/g, '\n');
+    fs.writeFileSync(tempPatchFile, normalizedPatch, 'utf8');
     runGit(['apply', '--whitespace=nowarn', `"${tempPatchFile}"`], baseDir);
 
     if (!options.excludeTests) {

@@ -36,6 +36,9 @@ function copyUntrackedFiles(baseDir: string, shadowDir: string): void {
 
     const files = untracked.split(/\r?\n/).filter(Boolean);
     for (const relFile of files) {
+      if (relFile.startsWith('.invar/') || relFile.startsWith('.invar\\')) {
+        continue;
+      }
       const srcPath = path.join(baseDir, relFile);
       const destPath = path.join(shadowDir, relFile);
       if (fs.existsSync(srcPath) && !fs.lstatSync(srcPath).isDirectory()) {
